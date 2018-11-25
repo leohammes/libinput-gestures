@@ -162,7 +162,12 @@ class COMMAND:
     def run(self, coords = None):
         'Run this command + arguments'
         args = self.argslist
-        run([str(coords[0]) if _a == 'x' else str(coords[1]) if _a == 'y' else _a for _a in args])
+        # replace x and y args with values
+        if coords:
+            x = str(coords[0])
+            y = str(coords[1])
+            args = [x if _a == 'x' else y if _a == 'y' else _a for _a in args]
+        run(args)
 
     def __str__(self):
         'Create string representation'

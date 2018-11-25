@@ -298,6 +298,24 @@ class GESTURE:
             command.run()
 
 @add_gesture_handler
+class DRAGSTART(GESTURE):
+    'Class to handle this type of gesture'
+    SUPPORTED_MOTIONS = ('all')
+    extended_text = '_'
+
+    def begin(self, fingers):
+        self.action()
+
+@add_gesture_handler
+class DRAGSTOP(GESTURE):
+    'Class to handle this type of gesture'
+    SUPPORTED_MOTIONS = ('all')
+    extended_text = '_'
+
+    def end(self, fingers):
+        self.action()
+
+@add_gesture_handler
 class SWIPE(GESTURE):
     'Class to handle this type of gesture'
     SUPPORTED_MOTIONS = ('left', 'right', 'up', 'down',

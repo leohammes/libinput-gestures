@@ -159,9 +159,13 @@ class COMMAND:
         args[0] = os.path.expandvars(os.path.expanduser(args[0]))
         self.argslist = args
 
-    def run(self):
+    def run(self, coords = None):
         'Run this command + arguments'
-        run(self.argslist)
+        args = self.argslist
+        # if coords:
+            # args = map(lambda _a: _a == "[coords]" ? "0 0" : _a, args)
+        # args = ['0 0' if a is '[coords]' else a for a in args]
+        run([str(coords[0]) if _a == 'x' else str(coords[1]) if _a == 'y' else _a for _a in args])
 
     def __str__(self):
         'Create string representation'
@@ -295,25 +299,7 @@ class GESTURE:
                 print('  ', command)
 
         if command and not args.debug:
-            command.run()
-
-@add_gesture_handler
-class DRAGSTART(GESTURE):
-    'Class to handle this type of gesture'
-    SUPPORTED_MOTIONS = ('all')
-    extended_text = '_'
-
-    def begin(self, fingers):
-        self.action()
-
-@add_gesture_handler
-class DRAGSTOP(GESTURE):
-    'Class to handle this type of gesture'
-    SUPPORTED_MOTIONS = ('all')
-    extended_text = '_'
-
-    def end(self, fingers):
-        self.action()
+            command.run(self.data)
 
 @add_gesture_handler
 class SWIPE(GESTURE):
@@ -358,6 +344,39 @@ class SWIPE(GESTURE):
                 motion = ('left_' if x < 0 else 'right_') + motion
 
         self.action(motion)
+
+@add_gesture_handler
+class SWIPEBEGIN(GESTURE):
+    'Class to handle this type of gesture'
+    SUPPORTED_MOTIONS = ('all')
+    extended_text = '_'
+
+    def generic(self, fingers, coords):
+        super().begin(fingers)
+        self.action('all')
+
+@add_gesture_handler
+class SWIPEUPDATE(GESTURE):
+    'Class to handle this type of gesture'
+    SUPPORTED_MOTIONS = ('all')
+    extended_text = '_'
+
+    def generic(self, fingers, coords):
+        super().begin(fingers)
+        self.data[0] = float(coords[2])
+        self.data[1] = float(coords[3])
+        self.action('all')
+
+@add_gesture_handler
+class SWIPEEND(GESTURE):
+    'Class to handle this type of gesture'
+    SUPPORTED_MOTIONS = ('all')
+    extended_text = '_'
+
+    def generic(self, fingers, coords):
+        super().begin(fingers)
+        self.action('all')
+
 
 @add_gesture_handler
 class PINCH(GESTURE):
@@ -604,3 +623,8 @@ for line in cmd.stdout:
     else:
         print('Unknown gesture + event received: {} + {}.'.format(gesture,
             event), file=sys.stderr)
+    
+    # Generic action
+    generic_handler = handlers.get('{}{}'.format(gesture, event).upper())
+    if generic_handler:
+        generic_handler.generic(fingers, coords = re.split(r'[^-.\d]+', params))

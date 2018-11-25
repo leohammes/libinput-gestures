@@ -162,9 +162,6 @@ class COMMAND:
     def run(self, coords = None):
         'Run this command + arguments'
         args = self.argslist
-        # if coords:
-            # args = map(lambda _a: _a == "[coords]" ? "0 0" : _a, args)
-        # args = ['0 0' if a is '[coords]' else a for a in args]
         run([str(coords[0]) if _a == 'x' else str(coords[1]) if _a == 'y' else _a for _a in args])
 
     def __str__(self):
@@ -204,7 +201,7 @@ class COMMAND_internal(COMMAND):
         self.args = opt.parse_args(self.argslist[1:])
         self.is_up = self.args.action == commands[0]
 
-    def run(self):
+    def run(self, coords = None):
         'Get list of current workspaces and select next one'
         stdout = run(('wmctrl', '-d'), check=False)
         if not stdout:
@@ -299,7 +296,7 @@ class GESTURE:
                 print('  ', command)
 
         if command and not args.debug:
-            command.run(self.data)
+            command.run(coords = self.data)
 
 @add_gesture_handler
 class SWIPE(GESTURE):

@@ -229,6 +229,10 @@ give a total of 8 swipe gestures each at 45 degrees separation. It works
 better than you may expect, at least after some practice. It means you
 can completely manage browser tabs from your touchpad.
 
+### THREE FINGER DRAG
+
+This branch allows you to configure three finger drag with begin, update, and end hooks for swipe and pinch gestures. See the example configuration in `libinput-gestures.conf`. **There are caveats:** libinput stops the cursor movement during these gestures, so we need to recreate the movement using xdotool. This bypasses pointer acceleration and spikes CPU usage, which is not great. Both swipe and pointer hooks need to be set, since smaller/slower actions register as pointer gestures. _Use at your own risk._
+
 ### TROUBLESHOOTING
 
 Please don't raise a github issue but provide little information about

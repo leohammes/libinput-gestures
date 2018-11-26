@@ -347,37 +347,59 @@ class SWIPE(GESTURE):
 
         self.action(motion)
 
-@add_gesture_handler
-class SWIPEBEGIN(GESTURE):
-    'Class to handle this type of gesture'
-    SUPPORTED_MOTIONS = ('all')
+class GENERIC_GESTURE(GESTURE):
+    'Class to handle begin, update, and end gesture hooks'
+    MOTION = 'all'
+    SUPPORTED_MOTIONS = (MOTION)
     extended_text = '_'
+
+class GENERIC_GESTURE_BEGIN(GENERIC_GESTURE):
+    'Class to handle generic begin gesture hooks'
 
     def generic(self, fingers, coords):
         super().begin(fingers)
-        self.action('all')
+        self.action(super().MOTION)
 
-@add_gesture_handler
-class SWIPEUPDATE(GESTURE):
-    'Class to handle this type of gesture'
-    SUPPORTED_MOTIONS = ('all')
-    extended_text = '_'
+class GENERIC_GESTURE_UPDATE(GENERIC_GESTURE):
+    'Class to handle generic update gesture hooks'
 
     def generic(self, fingers, coords):
         super().begin(fingers)
         self.data[0] = float(coords[2])
         self.data[1] = float(coords[3])
-        self.action('all')
+        self.action(super().MOTION)
 
-@add_gesture_handler
-class SWIPEEND(GESTURE):
-    'Class to handle this type of gesture'
-    SUPPORTED_MOTIONS = ('all')
-    extended_text = '_'
+class GENERIC_GESTURE_END(GENERIC_GESTURE):
+    'Class to handle generic end gesture hooks'
 
     def generic(self, fingers, coords):
         super().begin(fingers)
-        self.action('all')
+        self.action(super().MOTION)
+
+
+@add_gesture_handler
+class SWIPEBEGIN(GENERIC_GESTURE_BEGIN):
+    'Class to handle this type of gesture'
+
+@add_gesture_handler
+class SWIPEUPDATE(GENERIC_GESTURE_UPDATE):
+    'Class to handle this type of gesture'
+
+@add_gesture_handler
+class SWIPEEND(GENERIC_GESTURE_END):
+    'Class to handle this type of gesture'
+
+@add_gesture_handler
+class PINCHBEGIN(GENERIC_GESTURE_BEGIN):
+    'Class to handle this type of gesture'
+
+@add_gesture_handler
+class PINCHUPDATE(GENERIC_GESTURE_UPDATE):
+    'Class to handle this type of gesture'
+
+@add_gesture_handler
+class PINCHEND(GENERIC_GESTURE_END):
+    'Class to handle this type of gesture'
 
 
 @add_gesture_handler

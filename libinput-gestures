@@ -365,8 +365,8 @@ class GENERIC_GESTURE_UPDATE(GENERIC_GESTURE):
 
     def generic(self, fingers, coords):
         super().begin(fingers)
-        self.data[0] = float(coords[2])
-        self.data[1] = float(coords[3])
+        self.data[0] = float(coords[0])
+        self.data[1] = float(coords[1])
         self.action(super().MOTION)
 
 class GENERIC_GESTURE_END(GENERIC_GESTURE):

@@ -5,9 +5,15 @@ import os, sys, argparse, subprocess, shlex, re, getpass, fcntl, platform, math
 from collections import OrderedDict
 from pathlib import Path
 from distutils.version import LooseVersion as Version
+from datetime import datetime 
 
 PROGPATH = Path(sys.argv[0])
 PROGNAME = PROGPATH.stem
+
+import time as SYSTIME
+def tick():
+    return int(round(SYSTIME.time() * 1000))
+
 
 # Conf file containing gesture commands.
 # Search first for user file then system file.
@@ -26,6 +32,40 @@ swipe_min_threshold = 0
 # Rotation threshold in degrees to discriminate pinch rotate from in/out
 ROTATE_ANGLE = 15.0
 
+# Swipe gesture duration maximum (ms) between begin to end
+# for gesture action to be triggered
+swipe_max_timeout=200
+
+# Delay (ms) for gesture all before begin action triggered,
+# if end event come before delay, all begin, update and delay
+# is canceled
+gesture_all_delay_value=100
+
+# Execute gesture all action only if delay timeout already
+# reached. It can be set for individual fingers (3 and 4)
+gesture_all_3_usedelay=0
+gesture_all_4_usedelay=1
+
+# Addons variables for delay & timeout needs
+time_begin_gesture=0
+begin_action_sent=0
+begin_action_command=None
+begin_action_command_data=None
+
+# Check for swipe gesture timeout
+def is_timeout():
+    global time_begin_gesture
+    global swipe_max_timeout
+    if swipe_max_timeout==0:
+        return False
+    return tick()-time_begin_gesture>swipe_max_timeout
+
+# Check for gesture all already delayed
+def is_alldelayed():
+    global time_begin_gesture
+    global gesture_all_delay_value
+    return tick()-time_begin_gesture>gesture_all_delay_value
+
 # Set up command line arguments
 opt = argparse.ArgumentParser(description=__doc__)
 opt.add_argument('-c', '--conffile',
@@ -41,6 +81,7 @@ opt.add_argument('-l', '--list', action='store_true',
         help='just list out environment and configuration')
 opt.add_argument('--device',
         help='explicit device name to use (or path if starts with /)')
+
 # Test/diag hidden option to specify a file containing libinput list
 # device output to parse
 opt.add_argument('--device-list', help=argparse.SUPPRESS)
@@ -293,6 +334,20 @@ class GESTURE:
 
     def action(self, motion):
         'Action a motion command for this gesture'
+        # Prepare actions selection by timeouts
+        global gesture_all_3_usedelay
+        global gesture_all_4_usedelay
+        global begin_action_sent
+        global begin_action_command
+        global begin_action_command_data
+
+        # gesture_all_usedelay set for 3 or 4 fingers
+        gesture_all_usedelay=0
+        if gesture_all_3_usedelay and self.fingers=='3':
+            gesture_all_usedelay=1
+        if gesture_all_4_usedelay and self.fingers=='4':
+            gesture_all_usedelay=1
+
         command = self.motions.get((motion, self.fingers)) or \
                 self.motions.get(motion)
 
@@ -301,6 +356,36 @@ class GESTURE:
                 self.fingers, self.data))
             if command:
                 print('  ', command)
+        
+        # If gesture all use delays for this event
+        if gesture_all_usedelay==1:
+            if self.name=='SWIPEBEGIN' or self.name=='PINCHBEGIN':
+                # Dont execute action now. pending it for next update event
+                begin_action_command=command
+                begin_action_command_data=self.data
+                begin_action_sent=0
+                return
+            if self.name=='SWIPEUPDATE' or self.name=='PINCHUPDATE':
+                if begin_action_sent==0:
+                    # if begin action not sent yet, check for delay timeout
+                    if is_alldelayed():
+                        # delay reached, set begin sent, and execute action if avaiable
+                        begin_action_sent=1
+                        if begin_action_command and not args.debug:
+                            begin_action_command.run(coords = begin_action_command_data)
+                            begin_action_command_data=None
+                            begin_action_command=None
+                            return
+                    else:
+                        # delay not reached, just ignore this even
+                        return
+            if self.name=='SWIPEEND' or self.name=='PINCHEND':
+                if begin_action_sent==0:
+                    # It mean the delay doesn't meet the timeout, cancel it
+                    begin_action_sent=0
+                    return
+                else:
+                    begin_action_sent=0
 
         if command and not args.debug:
             command.run(coords = self.data)
@@ -327,6 +412,12 @@ class SWIPE(GESTURE):
 
     def end(self):
         'Action this gesture at the end of a motion sequence'
+
+        # Action will be canceled if gesture already long enough
+        # to reach the timeout
+        if is_timeout():
+            return
+            
         x, y = self.data
         abx = abs(x)
         aby = abs(y)
@@ -334,6 +425,8 @@ class SWIPE(GESTURE):
         # Require absolute distance movement beyond a small thresh-hold.
         if abx**2 + aby**2 < abzsquare:
             return
+
+        
 
         # Discriminate left/right or up/down.
         # If significant movement in both planes the consider it a
@@ -357,14 +450,12 @@ class GENERIC_GESTURE(GESTURE):
 
 class GENERIC_GESTURE_BEGIN(GENERIC_GESTURE):
     'Class to handle generic begin gesture hooks'
-
     def generic(self, fingers, coords):
         super().begin(fingers)
         self.action(super().MOTION)
 
 class GENERIC_GESTURE_UPDATE(GENERIC_GESTURE):
     'Class to handle generic update gesture hooks'
-
     def generic(self, fingers, coords):
         super().begin(fingers)
         self.data[0] = float(coords[0])
@@ -485,6 +576,52 @@ def swipe_threshold(lineargs):
         return 'Must be integer value'
 
     return None if swipe_min_threshold >= 0 else 'Must be >= 0'
+
+@add_conf_command
+def swipe_timeout(lineargs):
+    'Change swipe threshold'
+    global swipe_max_timeout
+    try:
+        swipe_max_timeout = int(lineargs)
+    except Exception:
+        return 'Must be integer value'
+    if swipe_max_timeout <= 60:
+        swipe_max_timeout=0
+    return None if swipe_max_timeout >= 0 else 'Must be >= 0'
+
+@add_conf_command
+def gesture_all_delay(lineargs):
+    'Change gesture all delay'
+    global gesture_all_delay_value
+    try:
+        gesture_all_delay_value = int(lineargs)
+    except Exception:
+        return 'Must be integer value'
+    if gesture_all_delay_value <= 60:
+        gesture_all_delay_value=60
+    return None if gesture_all_delay_value >= 25 else 'Must be >= 0'
+
+@add_conf_command
+def gesture_all3_use_delay(lineargs):
+    '3 fingers drag use delay'
+    global gesture_all_3_usedelay
+    try:
+        gesture_all_3_usedelay = int(lineargs)
+    except Exception:
+        gesture_all_3_usedelay = 0
+        return 'Must be integer value'
+    return None
+
+@add_conf_command
+def gesture_all4_use_delay(lineargs):
+    '4 fingers drag use delay'
+    global gesture_all_4_usedelay
+    try:
+        gesture_all_4_usedelay = int(lineargs)
+    except Exception:
+        gesture_all_4_usedelay = 0
+        return 'Must be integer value'
+    return None
 
 def get_conf_line(line):
     'Process a single line in conf file'
@@ -634,6 +771,9 @@ for line in cmd.stdout:
                     params), file=sys.stderr)
 
     elif event == 'BEGIN':
+        # Save current tickcount for timeouts & delays
+        time_begin_gesture=tick()
+        
         handler = handlers.get(gesture)
         if handler:
             handler.begin(fingers)

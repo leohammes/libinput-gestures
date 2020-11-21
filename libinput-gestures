@@ -47,6 +47,7 @@ gesture_all_3_usedelay=0
 gesture_all_4_usedelay=1
 
 # Addons variables for delay & timeout needs
+executions=0
 time_begin_gesture=0
 begin_action_sent=0
 begin_action_command=None
@@ -475,8 +476,44 @@ class SWIPEBEGIN(GENERIC_GESTURE_BEGIN):
     'Class to handle this type of gesture'
 
 @add_gesture_handler
-class SWIPEUPDATE(GENERIC_GESTURE_UPDATE):
+class SWIPEUPDATE(GESTURE):
     'Class to handle this type of gesture'
+    SUPPORTED_MOTIONS = ('left', 'right', 'all')
+    extended_text = '_'
+
+    def generic(self, fingers, coords):
+        global executions
+        super().begin(fingers)
+        self.data[0] = float(coords[0])
+        self.data[1] = float(coords[1])
+            
+        x, y = self.data
+        abx = abs(x)
+        aby = abs(y)
+
+        # Require absolute distance movement beyond a small thresh-hold.
+        if abx**2 + aby**2 < abzsquare:
+            return
+
+        # Discriminate left/right or up/down.
+        # If significant movement in both planes the consider it a
+        # oblique swipe (but only if any are configured)
+        if abx > aby:
+            motion = 'left' if x < 0 else 'right'
+            if self.has_extended and abx > 0 and aby / abx > OBLIQUE_RATIO:
+                motion += '_up' if y < 0 else '_down'
+        else:
+            motion = 'up' if y < 0 else 'down'
+            if self.has_extended and aby > 0 and abx / aby > OBLIQUE_RATIO:
+                motion = ('left_' if x < 0 else 'right_') + motion
+
+        # if begin action not sent yet, check for delay timeout
+        if executions == 17:
+            executions = 0;
+            self.action(motion)
+        else:
+            executions = executions + 1
+            return 'delayed {}'.format(motion)
 
 @add_gesture_handler
 class SWIPEEND(GENERIC_GESTURE_END):
